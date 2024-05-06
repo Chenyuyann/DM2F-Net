@@ -54,3 +54,89 @@ if __name__ == '__main__':
 
                 img_crop.save(os.path.join(patch_haze_path, '{}_h_{}_w_{}.png'.format(img_f_name, h_idx, w_idx)))
                 gt_crop.save(os.path.join(patch_gt_path, '{}_h_{}_w_{}.png'.format(gt_f_name, h_idx, w_idx)))
+
+    # 剩余图像作为验证集
+    last_list = [img_name for img_name in os.listdir(ori_haze_root) if int(img_name.split('_')[0]) > 35]
+
+    # 划分验证集和测试集
+    val_list = last_list[:5]
+    test_list = last_list[5:]
+
+    # 创建验证集和测试集的文件夹
+    val_root = os.path.join(ohaze_root, 'val'.format(crop_size))
+    val_haze_path = os.path.join(val_root, 'hazy')
+    val_gt_path = os.path.join(val_root, 'gt')
+
+    test_root = os.path.join(ohaze_root, 'test'.format(crop_size))
+    test_haze_path = os.path.join(test_root, 'hazy')
+    test_gt_path = os.path.join(test_root, 'gt')
+
+    os.makedirs(val_root, exist_ok=True)
+    os.makedirs(val_haze_path, exist_ok=True)
+    os.makedirs(val_gt_path, exist_ok=True)
+
+    os.makedirs(test_root, exist_ok=True)
+    os.makedirs(test_haze_path, exist_ok=True)
+    os.makedirs(test_gt_path, exist_ok=True)
+
+    # 将验证集图像保存到新的文件夹中
+    for idx, img_name in enumerate(tqdm(val_list)):
+        img_f_name, img_l_name = os.path.splitext(img_name)
+        gt_f_name = '{}GT'.format(img_f_name[: -4])
+
+        img = Image.open(os.path.join(ori_haze_root, img_name))
+        gt = Image.open(os.path.join(ori_gt_root, gt_f_name + img_l_name))
+
+        assert img.size == gt.size
+
+        w, h = img.size
+        stride = int(crop_size / 3.)
+        h_steps = 1 + int(ceil(float(max(h - crop_size, 0)) / stride))
+        w_steps = 1 + int(ceil(float(max(w - crop_size, 0)) / stride))
+
+        for h_idx in range(h_steps):
+            for w_idx in range(w_steps):
+                ws0 = w_idx * stride
+                ws1 = crop_size + ws0
+                hs0 = h_idx * stride
+                hs1 = crop_size + hs0
+                if h_idx == h_steps - 1:
+                    hs0, hs1 = max(h - crop_size, 0), h
+                if w_idx == w_steps - 1:
+                    ws0, ws1 = max(w - crop_size, 0), w
+                img_crop = img.crop((ws0, hs0, ws1, hs1))
+                gt_crop = gt.crop((ws0, hs0, ws1, hs1))
+
+                img_crop.save(os.path.join(val_haze_path, '{}_h_{}_w_{}.png'.format(img_f_name, h_idx, w_idx)))
+                gt_crop.save(os.path.join(val_gt_path, '{}_h_{}_w_{}.png'.format(gt_f_name, h_idx, w_idx)))
+
+    # 将测试集图像保存到新的文件夹中
+    for idx, img_name in enumerate(tqdm(test_list)):
+        img_f_name, img_l_name = os.path.splitext(img_name)
+        gt_f_name = '{}GT'.format(img_f_name[: -4])
+
+        img = Image.open(os.path.join(ori_haze_root, img_name))
+        gt = Image.open(os.path.join(ori_gt_root, gt_f_name + img_l_name))
+
+        assert img.size == gt.size
+
+        w, h = img.size
+        stride = int(crop_size / 3.)
+        h_steps = 1 + int(ceil(float(max(h - crop_size, 0)) / stride))
+        w_steps = 1 + int(ceil(float(max(w - crop_size, 0)) / stride))
+
+        for h_idx in range(h_steps):
+            for w_idx in range(w_steps):
+                ws0 = w_idx * stride
+                ws1 = crop_size + ws0
+                hs0 = h_idx * stride
+                hs1 = crop_size + hs0
+                if h_idx == h_steps - 1:
+                    hs0, hs1 = max(h - crop_size, 0), h
+                if w_idx == w_steps - 1:
+                    ws0, ws1 = max(w - crop_size, 0), w
+                img_crop = img.crop((ws0, hs0, ws1, hs1))
+                gt_crop = gt.crop((ws0, hs0, ws1, hs1))
+
+                img_crop.save(os.path.join(test_haze_path, '{}_h_{}_w_{}.png'.format(img_f_name, h_idx, w_idx)))
+                gt_crop.save(os.path.join(test_gt_path, '{}_h_{}_w_{}.png'.format(gt_f_name, h_idx, w_idx)))

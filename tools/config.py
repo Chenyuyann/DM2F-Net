@@ -11,6 +11,9 @@ root = osp.dirname(osp.abspath(__file__))
 # O-Haze
 OHAZE_ROOT = osp.abspath(osp.join(root, '../data', 'O-Haze'))
 
+# HazeRD
+HAZERD_ROOT = osp.abspath(osp.join(root, '../data', 'HazeRD'))
+
 # RESIDE
 TRAIN_ITS_ROOT = osp.abspath(osp.join(root, '../data', 'RESIDE', 'ITS_v2'))  # ITS
 TEST_SOTS_ROOT = osp.abspath(osp.join(root, '../data', 'RESIDE', 'SOTS', 'nyuhaze500'))  # SOTS indoor

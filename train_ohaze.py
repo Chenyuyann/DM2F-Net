@@ -17,6 +17,9 @@ from datasets import OHazeDataset
 from tools.utils import AvgMeter, check_mkdir, sliding_forward
 
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
 
 
 def parse_args():
@@ -36,7 +39,7 @@ def parse_args():
 cfgs = {
     'use_physical': True,
     'iter_num': 20000,
-    'train_batch_size': 16,
+    'train_batch_size': 8,
     'last_iter': 0,
     'lr': 2e-4,
     'lr_decay': 0.9,
@@ -167,7 +170,7 @@ def validate(net, curr_iter, optimizer):
                 r = dehaze[i].cpu().numpy().transpose([1, 2, 0])  # data range [0, 1]
                 g = gt[i].cpu().numpy().transpose([1, 2, 0])
                 psnr = peak_signal_noise_ratio(g, r)
-                ssim = structural_similarity(g, r, data_range=1, multichannel=True,
+                ssim = structural_similarity(g, r, data_range=1, multichannel=True, win_size=3,
                                              gaussian_weights=True, sigma=1.5, use_sample_covariance=False)
                 psnr_record.update(psnr)
                 ssim_record.update(ssim)
