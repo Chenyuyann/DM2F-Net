@@ -9,7 +9,7 @@ from torchvision import transforms
 from tools.config import TEST_SOTS_ROOT, OHAZE_ROOT, HAZERD_ROOT
 from tools.utils import AvgMeter, check_mkdir, sliding_forward
 from model import DM2FNet, DM2FNet_woPhy
-from datasets import SotsDataset, OHazeDataset
+from datasets import SotsDataset, OHazeDataset, HazeRDDataset
 from torch.utils.data import DataLoader
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity, mean_squared_error
 from skimage.color import rgb2lab
@@ -22,9 +22,9 @@ torch.manual_seed(2018)
 torch.cuda.set_device(0)
 
 ckpt_path = './ckpt'
-exp_name = 'RESIDE_ITS'
+# exp_name = 'RESIDE_ITS'
 # exp_name = 'O-Haze'
-# exp_name = 'HazeRD'
+exp_name = 'HazeRD'
 
 args = {
     # RESIDE
@@ -37,9 +37,9 @@ args = {
 }
 
 to_test = {
-    'SOTS': TEST_SOTS_ROOT,
+    # 'SOTS': TEST_SOTS_ROOT,
     # 'O-Haze': OHAZE_ROOT,
-    # 'HazeRD': HAZERD_ROOT,
+    'HazeRD': HAZERD_ROOT,
 }
 
 to_pil = transforms.ToPILImage()
@@ -49,7 +49,6 @@ def to_lab(image):
     Convert an RGB image to LAB color space.
     """
     lab_image = rgb2lab(image)
-    # return lab_image[:,:,0].flatten(), lab_image[:,:,1].flatten(), lab_image[:,:,2].flatten()
     return lab_image[:,:,0][0, 0], lab_image[:,:,1][0, 0], lab_image[:,:,2][0, 0]
 
 def main():
@@ -63,12 +62,18 @@ def main():
             elif 'O-Haze' in name:
                 net = DM2FNet_woPhy().cuda()
                 dataset = OHazeDataset(root, 'test')
+            elif 'HazeRD' in name:
+                net = DM2FNet().cuda()
+                dataset = HazeRDDataset(root, 'data')
             else:
                 raise NotImplementedError
 
             if len(args['snapshot']) > 0:
                 print('load snapshot \'%s\' for testing' % args['snapshot'])
-                net.load_state_dict(torch.load(os.path.join(ckpt_path, exp_name, args['snapshot'] + '.pth')))
+                if 'HazeRD' in name:
+                    net.load_state_dict(torch.load(os.path.join(ckpt_path, 'RESIDE_ITS', args['snapshot'] + '.pth')))
+                else:
+                    net.load_state_dict(torch.load(os.path.join(ckpt_path, exp_name, args['snapshot'] + '.pth')))
 
             net.eval()
             dataloader = DataLoader(dataset, batch_size=1)
@@ -80,10 +85,14 @@ def main():
                 haze, gts, fs = data
                 haze = haze.cuda()
 
-                if 'O-Haze' in name:
-                    res = sliding_forward(net, haze).detach()
-                else:
+                # if 'O-Haze' in name:
+                #     res = sliding_forward(net, haze).detach()
+                # else:
+                #     res = net(haze).detach()
+                if 'SOTS' in name:
                     res = net(haze).detach()
+                else:
+                    res = sliding_forward(net, haze).detach()
 
                 loss = criterion(res, gts.cuda())
                 loss_record.update(loss.item(), haze.size(0))

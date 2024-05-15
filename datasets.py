@@ -53,6 +53,24 @@ def make_dataset_ohaze(root: str, mode: str):
                          os.path.join(root, mode, 'gt', gt_name)])
     return img_list
 
+def make_dataset_hazerd(root: str, mode: str):
+    img_list = []
+    simu_path = os.path.join(root, mode, 'simu')
+    gt_path = os.path.join(root, mode, 'img')
+
+    for img_name in os.listdir(simu_path):
+        if img_name.endswith(".jpg"):
+            base_name = img_name.rsplit('_', 1)[0]
+            gt_name = base_name + '_RGB.jpg'
+
+            img_file_path = os.path.join(simu_path, img_name)
+            gt_file_path = os.path.join(gt_path, gt_name)
+            assert os.path.exists(img_file_path) and os.path.exists(gt_file_path), "File does not exist."
+            if os.path.exists(gt_file_path):
+                img_list.append((img_file_path, gt_file_path))
+
+    return img_list
+
 
 def make_dataset_oihaze_train(root, suffix):
     items = []
@@ -275,6 +293,24 @@ class OHazeDataset(data.Dataset):
 
             rotate_degree = np.random.choice([-90, 0, 90, 180])
             img, gt = img.rotate(rotate_degree, Image.BILINEAR), gt.rotate(rotate_degree, Image.BILINEAR)
+
+        return to_tensor(img), to_tensor(gt), name
+
+    def __len__(self):
+        return len(self.imgs)
+    
+class HazeRDDataset(data.Dataset):
+    def __init__(self, root, mode):
+        self.root = root
+        self.mode = mode
+        self.imgs = make_dataset_hazerd(root, mode)
+
+    def __getitem__(self, index):
+        haze_path, gt_path = self.imgs[index]
+        name = os.path.splitext(os.path.split(haze_path)[1])[0]
+
+        img = Image.open(haze_path).convert('RGB')
+        gt = Image.open(gt_path).convert('RGB')
 
         return to_tensor(img), to_tensor(gt), name
 
