@@ -53,6 +53,7 @@ def make_dataset_ohaze(root: str, mode: str):
                          os.path.join(root, mode, 'gt', gt_name)])
     return img_list
 
+
 def make_dataset_hazerd(root: str, mode: str):
     img_list = []
     simu_path = os.path.join(root, mode, 'simu')
@@ -299,6 +300,7 @@ class OHazeDataset(data.Dataset):
     def __len__(self):
         return len(self.imgs)
     
+
 class HazeRDDataset(data.Dataset):
     def __init__(self, root, mode):
         self.root = root
