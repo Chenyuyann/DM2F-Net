@@ -895,7 +895,7 @@ class DM2FNet(Base):
         t = F.upsample(self.t(f_phy), size=x0.size()[2:], mode='bilinear')
         x_phy = ((x0 - a * (1 - t)) / t.clamp(min=1e-8)).clamp(min=0., max=1.)
 
-        # J2 = I * exp(R2)
+        # J1 = I * exp(R1)
         r1 = F.upsample(self.j1(f1), size=x0.size()[2:], mode='bilinear')
         x_j1 = torch.exp(log_x0 + r1).clamp(min=0., max=1.)
 
@@ -903,7 +903,7 @@ class DM2FNet(Base):
         r2 = F.upsample(self.j2(f2), size=x0.size()[2:], mode='bilinear')
         x_j2 = ((x + r2) * self.std + self.mean).clamp(min=0., max=1.)
 
-        #
+        # J3 = I ^ R3
         r3 = F.upsample(self.j3(f3), size=x0.size()[2:], mode='bilinear')
         x_j3 = torch.exp(-torch.exp(log_log_x0_inverse + r3)).clamp(min=0., max=1.)
 

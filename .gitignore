@@ -4,4 +4,3 @@ __pycache__/
 ckpt
 data
 model
-*.xlsx

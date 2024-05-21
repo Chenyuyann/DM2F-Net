@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import torch
+import time
 from torch import nn
 from torchvision import transforms
 from tqdm import tqdm
@@ -31,7 +32,8 @@ exp_name = 'HazeRD'
 args = {
     # RESIDE
     # 'snapshot': 'iter_40000_loss_0.01230_lr_0.000000',
-    'snapshot': 'iter_30000_loss_0.02194_lr_0.000144',
+    'snapshot': 'iter_40000_loss_0.01225_lr_0.000000',
+    # 'snapshot': 'iter_35000_loss_0.01244_lr_0.000077',
 
     # O-Haze
     # 'snapshot': 'iter_19000_loss_0.04261_lr_0.000014',
@@ -78,6 +80,9 @@ def main():
     with torch.no_grad():
         criterion = nn.L1Loss().cuda()
 
+        # 启动整体计时
+        overall_start_time = time.time()
+
         for name, root in to_test.items():
             if 'SOTS' in name:
                 net = DM2FNet().cuda()
@@ -104,14 +109,16 @@ def main():
             psnrs, ssims, mses, ciede2000s = [], [], [], []
             loss_record = AvgMeter()
 
+            # 测试过程计时开始
+            test_start_time = time.time()
+
             for idx, data in enumerate(dataloader):
                 haze, gts, fs = data
                 haze = haze.cuda()
 
-                # if 'O-Haze' in name:
-                #     res = sliding_forward(net, haze).detach()
-                # else:
-                #     res = net(haze).detach()
+                # 单个数据处理计时开始
+                single_start_time = time.time()
+
                 if 'SOTS' in name:
                     res = net(haze).detach()
                 else:
@@ -147,6 +154,10 @@ def main():
                     print('predicting for {} ({}/{}) [{}]: MSE {:.4f}, PSNR {:.4f}, SSIM {:.4f}, CIEDE2000 {:.4f}'
                           .format(name, idx + 1, len(dataloader), fs[i], mse, psnr, ssim, ciede2000))
 
+                # 单个数据处理计时结束
+                single_elapsed_time = time.time() - single_start_time
+                print('Elapsed time for one sample: {:.4f} seconds'.format(single_elapsed_time))
+                
                 # Calculate mean scores for the dataset
                 mean_mse = np.mean(mse_scores)
                 mean_ciede2000 = np.mean(ciede2000_scores)
@@ -158,8 +169,15 @@ def main():
                         os.path.join(ckpt_path, exp_name,
                                      '(%s) %s_%s' % (exp_name, name, args['snapshot']), '%s.png' % f))
 
+            # 测试过程计时结束
+            test_elapsed_time = time.time() - test_start_time
+            print(f"Testing process took: {test_elapsed_time:.2f} seconds")
+
             print(f"[{name}] L1: {loss_record.avg:.6f}, MSE: {np.mean(mses):.6f}, PSNR: {np.mean(psnrs):.6f}, SSIM: {np.mean(ssims):.6f}, CIEDE2000: {np.mean(ciede2000s):.6f}")
 
-
+        # 整体过程计时结束
+        overall_elapsed_time = time.time() - overall_start_time
+        print(f"Overall process took: {overall_elapsed_time:.2f} seconds")
+            
 if __name__ == '__main__':
     main()
