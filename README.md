@@ -59,7 +59,7 @@ Training a model on a single ~~GTX 1080Ti~~ TITAN RTX GPU takes about ~~4~~ 5 ho
 
 1. Set the path of five benchmark datasets in tools/config.py.
 2. Put the trained model in `./ckpt/`.
-2. Run by ```python test.py```
+3. Run by `python test.py` (for O-Haze/HazeRD/RESIDE) or `python output.py` (for own pictures)
 
 *Settings* of testing were set at the top of `test.py`, and you can conveniently
 change them as you need.
