@@ -10,10 +10,12 @@ exp_name = 'RESIDE_ITS'
 
 args = {
     # RESIDE
-    'snapshot': 'iter_30000_loss_0.02194_lr_0.000144',
+    # 'snapshot': 'iter_40000_loss_0.01225_lr_0.000000', # baseline
+    'snapshot': 'iter_40000_loss_0.01237_lr_0.000000', # improve
 
     # O-Haze
-    # 'snapshot': 'iter_20000_loss_0.05028_lr_0.000000',
+    # 'snapshot': 'iter_20000_loss_0.05028_lr_0.000000', # baseline
+    # 'snapshot': 'iter_20000_loss_0.04962_lr_0.000000', # improve
 }
 
 def load_and_process_image(image_path, net):
@@ -38,19 +40,9 @@ def main():
     image_paths = [
         'data/Others/berlin-8429763_1920.jpg',
         'data/Others/budapest-2058395_1920.jpg',
-        'data/Others/city-5721873_1920.jpg',
-        'data/Others/tokyo-1141165_1920.jpg',
-        'data/Others/bridge-2617838_1920.jpg',
-        'data/Others/church-473735_1920.jpg',
-        'data/Others/dom-8429773_1920.jpg',
-        'data/Others/moutains-3974479_1920.jpg',
-        'data/Others/castle-5734731_1920.jpg',
         'data/Others/city-5184919_1920.jpg',
-        'data/Others/haze-5184916_1920.jpg',
+        'data/Others/city-5721873_1920.jpg',
         'data/Others/niagara-falls-4083_1920.jpg',
-        'data/Others/city-5929528_1920.jpg',
-        'data/Others/rostock-3965049_1920.jpg',
-        'data/Others/turku-577286_1920.jpg',
     ]
 
     output_dir = os.path.join('ckpt/Others', '%s_%s' % (exp_name, args['snapshot']))

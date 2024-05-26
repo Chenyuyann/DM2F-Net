@@ -39,7 +39,7 @@ cfgs = {
     'last_iter': 0,
     'lr': 5e-4,
     'lr_decay': 0.9,
-    'weight_decay': 0,
+    'weight_decay': 1e-5,
     'momentum': 0.9,
     'snapshot': '',
     'val_freq': 5000,
@@ -59,6 +59,8 @@ def main():
                     if name[-4:] != 'bias' and param.requires_grad],
          'lr': cfgs['lr'], 'weight_decay': cfgs['weight_decay']}
     ])
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=cfgs['val_freq'], gamma=0.5)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, cfgs['val_freq'], T_mult=2, eta_min=1e-9)
 
     if len(cfgs['snapshot']) > 0:
         print('training resumes from \'%s\'' % cfgs['snapshot'])
@@ -151,6 +153,7 @@ def train(net, optimizer):
             if curr_iter > cfgs['iter_num']:
                 break
 
+        # scheduler.step()
 
 def validate(net, curr_iter, optimizer):
     print('validating...')

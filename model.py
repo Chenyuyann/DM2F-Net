@@ -715,18 +715,47 @@ class ours_wo_J0(Base):
             return x_fusion
 
 
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(ResidualBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.selu = nn.SELU(inplace=True)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(out_channels, in_channels, kernel_size=1)
+        
+    def forward(self, x):
+        identity = x
+        out = self.conv1(x)
+        out = self.selu(out)
+        out = self.conv2(out)
+        out = self.selu(out)
+        out = self.conv3(out)
+        out += identity
+        out = self.selu(out)
+        return out
+    
+
+class MultiScaleFeatureFusion(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(MultiScaleFeatureFusion, self).__init__()
+        self.conv1x1 = nn.Conv2d(in_channels, out_channels, 1)
+        self.conv3x3 = nn.Conv2d(in_channels, out_channels, 3, padding=1)
+        self.conv5x5 = nn.Conv2d(in_channels, out_channels, 5, padding=2)
+        self.selu = nn.SELU(inplace=True)
+
+    def forward(self, x):
+        out1 = self.conv1x1(x)
+        out2 = self.conv3x3(x)
+        out3 = self.conv5x5(x)
+        out = out1 + out2 + out3
+        out = self.selu(out)
+        return out
+    
+
 class DM2FNet(Base):
     def __init__(self, num_features=128, arch='resnext101_32x8d'):
         super(DM2FNet, self).__init__()
         self.num_features = num_features
-
-        # resnext = ResNeXt101()
-        #
-        # self.layer0 = resnext.layer0
-        # self.layer1 = resnext.layer1
-        # self.layer2 = resnext.layer2
-        # self.layer3 = resnext.layer3
-        # self.layer4 = resnext.layer4
 
         assert arch in ['resnet50', 'resnet101',
                         'resnet152', 'resnext50_32x4d', 'resnext101_32x8d']
@@ -764,26 +793,10 @@ class DM2FNet(Base):
             nn.Conv2d(num_features, num_features * 4, kernel_size=1)
         )
 
-        self.attention1 = nn.Sequential(
-            nn.Conv2d(num_features * 4, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features * 4, kernel_size=1)
-        )
-        self.attention2 = nn.Sequential(
-            nn.Conv2d(num_features * 4, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features * 4, kernel_size=1)
-        )
-        self.attention3 = nn.Sequential(
-            nn.Conv2d(num_features * 4, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features * 4, kernel_size=1)
-        )
-        self.attention4 = nn.Sequential(
-            nn.Conv2d(num_features * 4, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features * 4, kernel_size=1)
-        )
+        self.attention1 = ResidualBlock(num_features * 4, num_features)
+        self.attention2 = ResidualBlock(num_features * 4, num_features)
+        self.attention3 = ResidualBlock(num_features * 4, num_features)
+        self.attention4 = ResidualBlock(num_features * 4, num_features)
 
         self.refine = nn.Sequential(
             nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
@@ -815,6 +828,8 @@ class DM2FNet(Base):
             nn.Conv2d(num_features // 2, 15, kernel_size=1)
         )
 
+        self.feature_fusion = MultiScaleFeatureFusion(num_features * 4, num_features * 4)
+
         for m in self.modules():
             if isinstance(m, nn.SELU) or isinstance(m, nn.ReLU):
                 m.inplace = True
@@ -834,12 +849,6 @@ class DM2FNet(Base):
         layer3 = backbone.layer3(layer2)
         layer4 = backbone.layer4(layer3)
 
-        # layer0 = self.layer0(x)
-        # layer1 = self.layer1(layer0)
-        # layer2 = self.layer2(layer1)
-        # layer3 = self.layer3(layer2)
-        # layer4 = self.layer4(layer3)
-
         down1 = self.down1(layer1)
         down2 = self.down2(layer2)
         down3 = self.down3(layer3)
@@ -851,33 +860,35 @@ class DM2FNet(Base):
 
         concat = torch.cat((down1, down2, down3, down4), 1)
 
+        fused_features = self.feature_fusion(concat)
+
         n, c, h, w = down1.size()
 
-        attention_phy = self.attention_phy(concat)
+        attention_phy = self.attention_phy(fused_features)
         attention_phy = F.softmax(attention_phy.view(n, 4, c, h, w), 1)
         f_phy = down1 * attention_phy[:, 0, :, :, :] + down2 * attention_phy[:, 1, :, :, :] + \
                 down3 * attention_phy[:, 2, :, :, :] + down4 * attention_phy[:, 3, :, :, :]
         f_phy = self.refine(f_phy) + f_phy
 
-        attention1 = self.attention1(concat)
+        attention1 = self.attention1(fused_features)
         attention1 = F.softmax(attention1.view(n, 4, c, h, w), 1)
         f1 = down1 * attention1[:, 0, :, :, :] + down2 * attention1[:, 1, :, :, :] + \
              down3 * attention1[:, 2, :, :, :] + down4 * attention1[:, 3, :, :, :]
         f1 = self.refine(f1) + f1
 
-        attention2 = self.attention2(concat)
+        attention2 = self.attention2(fused_features)
         attention2 = F.softmax(attention2.view(n, 4, c, h, w), 1)
         f2 = down1 * attention2[:, 0, :, :, :] + down2 * attention2[:, 1, :, :, :] + \
              down3 * attention2[:, 2, :, :, :] + down4 * attention2[:, 3, :, :, :]
         f2 = self.refine(f2) + f2
 
-        attention3 = self.attention3(concat)
+        attention3 = self.attention3(fused_features)
         attention3 = F.softmax(attention3.view(n, 4, c, h, w), 1)
         f3 = down1 * attention3[:, 0, :, :, :] + down2 * attention3[:, 1, :, :, :] + \
              down3 * attention3[:, 2, :, :, :] + down4 * attention3[:, 3, :, :, :]
         f3 = self.refine(f3) + f3
 
-        attention4 = self.attention4(concat)
+        attention4 = self.attention4(fused_features)
         attention4 = F.softmax(attention4.view(n, 4, c, h, w), 1)
         f4 = down1 * attention4[:, 0, :, :, :] + down2 * attention4[:, 1, :, :, :] + \
              down3 * attention4[:, 2, :, :, :] + down4 * attention4[:, 3, :, :, :]
@@ -930,17 +941,32 @@ class DM2FNet(Base):
             return x_fusion
 
 
+class ResidualBlock_woPhy(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(ResidualBlock_woPhy, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.selu = nn.SELU(inplace=True)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(out_channels, in_channels, kernel_size=3, padding=1)
+        
+    def forward(self, x):
+        identity = x
+        out = self.conv1(x)
+        out = self.selu(out)
+        out = self.conv2(out)
+        out = self.selu(out)
+        out = self.conv3(out)
+        out += identity
+        out = self.selu(out)
+        out = self.conv1(x)
+        out = self.selu(out)
+        return out
+    
+
 class DM2FNet_woPhy(Base_OHAZE):
     def __init__(self, num_features=64, arch='resnext101_32x8d'):
         super(DM2FNet_woPhy, self).__init__()
         self.num_features = num_features
-
-        # resnext = ResNeXt101Syn()
-        # self.layer0 = resnext.layer0
-        # self.layer1 = resnext.layer1
-        # self.layer2 = resnext.layer2
-        # self.layer3 = resnext.layer3
-        # self.layer4 = resnext.layer4
 
         assert arch in ['resnet50', 'resnet101',
                         'resnet152', 'resnext50_32x4d', 'resnext101_32x8d']
@@ -948,20 +974,9 @@ class DM2FNet_woPhy(Base_OHAZE):
         del backbone.fc
         self.backbone = backbone
 
-        self.down0 = nn.Sequential(
-            nn.Conv2d(64, num_features, kernel_size=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU()
-        )
-        self.down1 = nn.Sequential(
-            nn.Conv2d(256, num_features, kernel_size=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU()
-        )
-        self.down2 = nn.Sequential(
-            nn.Conv2d(512, num_features, kernel_size=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU()
-        )
+        self.down0 = ResidualBlock_woPhy(64, num_features)
+        self.down1 = ResidualBlock_woPhy(256, num_features)
+        self.down2 = ResidualBlock_woPhy(512, num_features)
         self.down3 = nn.Sequential(
             nn.Conv2d(1024, num_features, kernel_size=1), nn.SELU()
         )
@@ -969,26 +984,10 @@ class DM2FNet_woPhy(Base_OHAZE):
             nn.Conv2d(2048, num_features, kernel_size=1), nn.SELU()
         )
 
-        self.fuse3 = nn.Sequential(
-            nn.Conv2d(num_features * 2, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1)
-        )
-        self.fuse2 = nn.Sequential(
-            nn.Conv2d(num_features * 2, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1)
-        )
-        self.fuse1 = nn.Sequential(
-            nn.Conv2d(num_features * 2, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1)
-        )
-        self.fuse0 = nn.Sequential(
-            nn.Conv2d(num_features * 2, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1), nn.SELU(),
-            nn.Conv2d(num_features, num_features, kernel_size=3, padding=1)
-        )
+        self.fuse3 = ResidualBlock_woPhy(num_features * 2, num_features)
+        self.fuse2 = ResidualBlock_woPhy(num_features * 2, num_features)
+        self.fuse1 = ResidualBlock_woPhy(num_features * 2, num_features)
+        self.fuse0 = ResidualBlock_woPhy(num_features * 2, num_features)
 
         self.fuse3_attention = nn.Sequential(
             nn.Conv2d(num_features * 2, num_features, kernel_size=3, padding=1), nn.SELU(),

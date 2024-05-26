@@ -25,25 +25,24 @@ torch.manual_seed(2018)
 torch.cuda.set_device(0)
 
 ckpt_path = './ckpt'
-# exp_name = 'RESIDE_ITS'
+exp_name = 'RESIDE_ITS'
 # exp_name = 'O-Haze'
-exp_name = 'HazeRD'
+# exp_name = 'HazeRD'
 
 args = {
     # RESIDE
-    # 'snapshot': 'iter_40000_loss_0.01230_lr_0.000000',
-    'snapshot': 'iter_40000_loss_0.01225_lr_0.000000',
-    # 'snapshot': 'iter_35000_loss_0.01244_lr_0.000077',
+    # 'snapshot': 'iter_40000_loss_0.01225_lr_0.000000', # baseline
+    'snapshot': 'iter_40000_loss_0.01237_lr_0.000000', # improve
 
     # O-Haze
-    # 'snapshot': 'iter_19000_loss_0.04261_lr_0.000014',
-    # 'snapshot': 'iter_20000_loss_0.05028_lr_0.000000',
+    # 'snapshot': 'iter_20000_loss_0.05028_lr_0.000000', # baseline
+    # 'snapshot': 'iter_20000_loss_0.04962_lr_0.000000', # improve
 }
 
 to_test = {
-    # 'SOTS': TEST_SOTS_ROOT,
+    'SOTS': TEST_SOTS_ROOT,
     # 'O-Haze': OHAZE_ROOT,
-    'HazeRD': HAZERD_ROOT,
+    # 'HazeRD': HAZERD_ROOT,
 }
 
 to_pil = transforms.ToPILImage()
@@ -82,6 +81,7 @@ def main():
 
         # 启动整体计时
         overall_start_time = time.time()
+        only_test_time = 0
 
         for name, root in to_test.items():
             if 'SOTS' in name:
@@ -124,6 +124,10 @@ def main():
                 else:
                     res = sliding_forward(net, haze).detach()
 
+                single_test_time = time.time() - single_start_time
+                print('Test time for one sample: {:.4f} seconds'.format(single_test_time))
+                only_test_time += single_test_time
+
                 loss = criterion(res, gts.cuda())
                 loss_record.update(loss.item(), haze.size(0))
 
@@ -165,9 +169,10 @@ def main():
                 ciede2000s.append(mean_ciede2000)
 
                 for r, f in zip(res.cpu(), fs):
-                    to_pil(r).save(
-                        os.path.join(ckpt_path, exp_name,
-                                     '(%s) %s_%s' % (exp_name, name, args['snapshot']), '%s.png' % f))
+                    save_dir = os.path.join(ckpt_path, exp_name, '(%s) %s_%s' % (exp_name, name, args['snapshot']))
+                    os.makedirs(save_dir, exist_ok=True)
+                    save_path = os.path.join(save_dir, f'{f}.png')
+                    to_pil(r).save(save_path)
 
             # 测试过程计时结束
             test_elapsed_time = time.time() - test_start_time
@@ -178,6 +183,7 @@ def main():
         # 整体过程计时结束
         overall_elapsed_time = time.time() - overall_start_time
         print(f"Overall process took: {overall_elapsed_time:.2f} seconds")
+        print(f"Overall test time: {only_test_time:.2f} seconds")
             
 if __name__ == '__main__':
     main()
