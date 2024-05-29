@@ -1,15 +1,52 @@
-# DM2F-Net
+# DM2F-Net-improve
 
-By Zijun Deng, Lei Zhu, Xiaowei Hu, Chi-Wing Fu, Xuemiao Xu, Qing Zhang, Jing Qin, and Pheng-Ann Heng.
-
-This repo is the implementation of
-"[Deep Multi-Model Fusion for Single-Image Dehazing](https://openaccess.thecvf.com/content_ICCV_2019/papers/Deng_Deep_Multi-Model_Fusion_for_Single-Image_Dehazing_ICCV_2019_paper.pdf)"
-(ICCV 2019), written by Zijun Deng at the South China University of Technology.
+By Yuyan Chen.
 
 ## Results
 
-The dehazing results can be found at 
-[Google Drive](https://drive.google.com/drive/folders/1ZVBI_3Y2NthVLeK7ODMIB5vRjmN9payF?usp=sharing).
+<table border="1" style="width: 100%; text-align: center;">
+  <tr>
+    <th> </th>
+    <th>算法</th>
+    <th>MSE</th>
+    <th>PNSR</th>
+    <th>SSIM</th>
+    <th>CIEDE2000</th>
+  </tr>
+  <tr>
+   <th rowspan="2">O-Haze</th>
+    <td>baseline</td>
+    <td>0.0038</td>
+    <td>24.304</td>
+    <td>0.7192</td>
+    <td>4.7643</td>
+  </tr>
+  <tr>
+    <td>improve</td>
+    <td>0.0037</td>
+    <td>24.436</td>
+    <td>0.7242</td>
+    <td>4.7547</td>
+  </tr>
+  <tr>
+    <th rowspan="2">HazeRD</th>
+    <td>baseline</td>
+    <td>0.0679</td>
+    <td>14.481</td>
+    <td>0.8314</td>
+    <td>16.161</td>
+  </tr>
+  <tr>
+    <td>improve</td>
+    <td>0.0695</td>
+    <td>14.584</td>
+    <td>0.8315</td>
+    <td>16.036</td>
+  </tr>
+</table>
+
+
+The dehazing results can be found at [Baidu Wangpan](https://pan.baidu.com/s/1ajlm7uyo4cCjADaek6EnSw).
 
 ## Installation & Preparation
 
@@ -40,24 +77,16 @@ Make sure you have `Python>=3.7` installed on your machine.
 
 ## Training
 
-1. ~~Set the path of pretrained ResNeXt model in resnext/config.py~~
-2. Set the path of datasets in tools/config.py
-3. Run by ```python train.py```
-
-~~The pretrained ResNeXt model is ported from the [official](https://github.com/facebookresearch/ResNeXt) torch version,
-using the [convertor](https://github.com/clcarwin/convert_torch_to_pytorch) provided by clcarwin. 
-You can directly [download](https://drive.google.com/open?id=1dnH-IHwmu9xFPlyndqI6MfF4LvH6JKNQ) the pretrained model ported by me.~~
+1. Set the path of datasets in `tools/config.py`
+2. Run by ```python train.py```
 
 Use pretrained ResNeXt (resnext101_32x8d) from torchvision.
 
-*Hyper-parameters* of training were set at the top of *train.py*, and you can conveniently
-change them as you need.
-
-Training a model on a single ~~GTX 1080Ti~~ TITAN RTX GPU takes about ~~4~~ 5 hours.
+Training a model on a single RTX 3080 Ti(12GB) GPU takes about 6 hours.
 
 ## Testing
 
-1. Set the path of five benchmark datasets in tools/config.py.
+1. Set the path of five benchmark datasets in `tools/config.py`.
 2. Put the trained model in `./ckpt/`.
 3. Run by `python test.py` (for O-Haze/HazeRD/RESIDE) or `python output.py` (for own pictures)
 
